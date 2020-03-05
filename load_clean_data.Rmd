@@ -1,0 +1,273 @@
+---
+title: "Load and Clean datasets"
+author: "Aleksei Sorokin, asorokin@hawk.iit.edu, A20394300"
+date: "3/3/2020"
+output: pdf_document
+geometry: margin=1in
+---
+
+## Notes
+Data sourced from https://www.pro-football-reference.com/coaches/
+
+## Packages 
+```{r}
+library(stringr)
+library(rvest)
+library(tidyr)
+```
+
+## Scrape & clean football coaches
+```{r}
+url_fb <- 'https://www.pro-football-reference.com/coaches/' # hockey
+t_fb <- html_nodes(read_html(url_fb), css = 'table')
+df_fb_og <- html_table(t_fb[[1]])
+# rename original columns 
+colnames(df_fb_og) = c(
+  'RK', # rank
+  'N', # coach name
+  'Y', # total years coaching
+  'YR', # range of years coached in
+  'G', # total games coached
+  'W', # total wins
+  'L', # total losses
+  'T', # ties
+  'WL%', # win-loss %
+  'GO500', # number of games over .500 (wins-losses)
+  'PY', # playoff years
+  'PG', # years coach made playoffs
+  'PW', # playoff wins
+  'PL', # playoff losses
+  'PWL%', # playoff win-loss %
+  'MCR', # mean conference rank (16 teams per conference)
+  'BCR', # best conference rank
+  'C', # championships (includes super bowls or championships)
+  'SBW', # super bowl champions
+  'CC') # conference championships
+# drop useless and dependent columns
+drop_cols <- c(
+  'RK', # don't need rank
+  'W','L','T','GO500', # total games and win-loss % are sufficient
+  'PW','PL', # playoff games and playoff win-loss % are sufficient
+  'PY','MCR','BCR', # not consistently provided across all datasets
+  'SBW') # championships includes super-bowl wins and championships before super-bowl
+df_fb <- df_fb_og[,!(names(df_fb_og)%in%drop_cols)]
+# set na values to 0
+df_fb[is.na(df_fb)] <- 0
+# extract hall of fame indicator (1=HOF, 0=!HOF)
+df_fb$HOF <- grepl('\\+',df_fb[['N']])
+df_fb$HOF <- as.numeric(df_fb$HOF)
+# clean up names
+df_fb$N <- gsub('\\+','',df_fb[['N']])
+df_fb$N <- str_squish(df_fb$N)
+# split year range and only keep final year coaching
+df_fb[,c('YS','YE')] <- do.call(rbind,strsplit(df_fb$YR,'-'))
+df_fb$YE <- as.numeric(df_fb$YE)
+df_fb <- df_fb[,!(names(df_fb)%in%c('YS','YR'))] # drop year range for year end
+# ensure numeric datatypes
+for (col in (names(df_fb))){if (col !='N'){df_fb[,col] <- as.numeric(df_fb[,col])}}
+# reindex
+rownames(df_fb) = 1:nrow(df_fb)
+# output
+head(df_fb)
+summary(df_fb)
+```
+
+## Scrape & clean baksetball coaches
+```{r}
+url_bkb <- 'https://www.basketball-reference.com/coaches/NBA_stats.html' # hockey
+t_bkb <- html_nodes(read_html(url_bkb), css = 'table')
+df_bkb_og <- html_table(t_bkb[[1]])[-1,]
+# rename original columns 
+colnames(df_bkb_og) = c(
+  'RK', # rank
+  'N', # coach name
+  'YS', # first year coaching
+  'YE', # last year coaching
+  'Y', # total years coaching
+  'G', # total games coached
+  'W', # total wins
+  'L', # total losses
+  'WL%', # win-loss %
+  'GO500Over2', # number of games over .500 (wins-losses)/2
+  'PG', # years coach made playoffs
+  'PW', # playoff wins
+  'PL', # playoff losses
+  'PWL%', # playoff win-loss %
+  'CC', # conference championships
+  'C') # championships
+# remove header rows
+df_bkb <- df_bkb_og[!(df_bkb_og$G=='Regular Season' | df_bkb_og$G=='G'),]
+# drop useless and dependent columns
+drop_cols <- c(
+  'RK', # don't need rank
+  'YS', # captured by total years (Y) and last year coaching (YE)
+  'W','L','GO500Over2', # total games and win-loss % are sufficient
+  'PW','PL') # playoff games and playoff win-loss % are sufficient
+df_bkb <- df_bkb[,!(names(df_bkb)%in%drop_cols)]
+# set columns to be numeric
+for (col in (names(df_bkb))){if (col !='N'){df_bkb[,col] <- as.numeric(df_bkb[,col])}}
+# set na values to 0
+df_bkb[is.na(df_bkb)] <- 0
+# extract hall of fame indicator (1=HOF, 0=!HOF)
+df_bkb$HOF <- grepl('\\*',df_bkb[['N']])
+df_bkb$HOF <- as.numeric(df_bkb$HOF)
+# clean up names
+df_bkb$N <- gsub('\\*','',df_bkb[['N']])
+df_bkb$N <- str_squish(df_bkb$N)
+# reindex
+rownames(df_bkb) = 1:nrow(df_bkb)
+# output
+head(df_bkb)
+summary(df_bkb)
+```
+
+## Scrape and clean baseball coaches
+```{r}
+url_bb <- 'https://www.baseball-reference.com/managers/'
+t_bb <- html_nodes(read_html(url_bb), css = 'table')
+df_bb_og <- html_table(t_bb[[1]])
+# rename original columns 
+colnames(df_bb_og) = c(
+  'RK', # rank
+  'N', # coach name
+  'Y', # total years coaching
+  'YS', # first year coaching
+  'YE', # last year coaching
+  'W', # total wins
+  'L', # total losses
+  'WL%', # win-loss %
+  'T', # ties
+  'GO500', # games over 500 (W-L)
+  'G', # total games coached
+  'PW', # playoff wins
+  'PL', # playoff losses
+  'PWL%', # playoff win-loss %
+  'BF', # best finish
+  'WF', # worst finish
+  'MRK', # mean rank
+  'E', # ejections
+  'PY', # years in the playoffs
+  'C',# championships (World Series wins)
+  'CC', # conference championships (pennant wins)
+  'AGM', # all star games managed
+  'PS', # player stats
+  'PMY') # years as player or manager
+# remove header rows
+df_bb <- df_bb_og[!(df_bb_og$N=='Mgr'),]
+# set columns to be numeric
+for (col in (names(df_bb))){if (col !='N'){df_bb[,col] <- as.numeric(df_bb[,col])}}
+# calculate PG (postseason games)
+df_bb$PG <- df_bb$PW+df_bb$PL
+# drop useless and dependent columns
+drop_cols <- c(
+  'RK', # don't need rank
+  'YS', # captured by total years (Y) and last year coaching (YE)
+  'W','L','T','GO500', # total games and win-loss % are sufficient
+  'OL','PTS','PTS%',  # not consistently provided across all datasets
+  'PW','PL', # playoff games and playoff win-loss % are sufficient
+  'BF','WF','MRK','E','PY','AGM','PS','PMY') # not consistently provided across all datasets
+df_bb <- df_bb[,!(names(df_bb)%in%drop_cols)]
+# set na values to 0
+df_bb[is.na(df_bb)] <- 0
+# extract hall of fame indicator (1=HOF, 0=!HOF)
+df_bb$HOF <- grepl('HOF',df_bb[['N']])
+df_bb$HOF <- as.numeric(df_bb$HOF)
+# clean up names
+df_bb$N <- gsub('HOF','',df_bb[['N']])
+df_bb$N <- str_squish(df_bb$N)
+# reindex
+rownames(df_bb) = 1:nrow(df_bb)
+# output
+df_bb
+summary(df_bb)
+```
+
+## Scrape and clean hockey coaches
+```{r}
+url_h <- 'https://www.hockey-reference.com/coaches/NHL_stats.html' # hockey
+t_h <- html_nodes(read_html(url_h), css = 'table')
+df_h_og <- html_table(t_h[[1]])[-1,]
+# rename original columns 
+colnames(df_h_og) = c(
+  'RK', # rank
+  'N', # coach name
+  'YS', # first year coaching
+  'YE', # last year coaching
+  'Y', # total years coaching
+  'G', # total games coached
+  'W', # total wins
+  'L', # total losses
+  'T', # ties
+  'OL', # overtime losses
+  'PTS', # points
+  'PTS%', # points / total possible points
+  'PG', # years coach made playoffs
+  'PW', # playoff wins
+  'PL', # playoff losses
+  'PT', # playoff ties
+  'PWL%', # playoff win-loss %
+  'CC', # conference championships
+  'C') # championships (Stanley Cup wins)
+# remove header rows
+df_h <- df_h_og[!(df_h_og$RK=='RK' | df_h_og$N=='Coach'),]
+# set columns to be numeric
+for (col in (names(df_h))){if (col !='N'){df_h[,col] <- as.numeric(df_h[,col])}}
+# calculate wl% (win loss %)
+df_h$`WL%` <- df_h$W/(df_h$W+df_h$L)
+# drop useless and dependent columns
+drop_cols <- c(
+  'RK', # don't need rank
+  'YS', # captured by total years (Y) and last year coaching (YE)
+  'W','L','T', # total games and win-loss % are sufficient
+  'OL','PTS','PTS%',  # not consistently provided across all datasets
+  'PW','PL','PT') # playoff games and playoff win-loss % are sufficient
+df_h <- df_h[,!(names(df_h)%in%drop_cols)]
+# set na values to 0
+df_h[is.na(df_h)] <- 0
+# extract hall of fame indicator (1=HOF, 0=!HOF)
+df_h$HOF <- grepl('\\*',df_h[['N']])
+df_h$HOF <- as.numeric(df_h$HOF)
+# clean up names
+df_h$N <- gsub('\\*','',df_h[['N']])
+df_h$N <- str_squish(df_h$N)
+# reindex
+rownames(df_h) = NULL
+# output
+df_h
+summary(df_h)
+```
+
+## Overall cleaning and export datasets
+```{r}
+# Make games relative to number of relative season games
+df_fb$GR <- df_fb$G / 16
+df_bkb$GR <- df_bkb$G / 82
+df_bb$GR <- df_bb$G / 162
+df_h$GR <- df_h$G / 82
+# Make playoff games relative to minimum games needed to win championship
+df_fb$PGR <- df_fb$PG / 3
+df_bkb$PGR <- df_bkb$PG / (4*4)
+df_bb$PGR <- df_bb$PG / (3+4+4)
+df_h$PGR <- df_h$PG / (4*4)
+# finalize columns and order them
+#  Doesn't include YE (last year coaching). 
+#    Could be useful, but too many values to be a factor
+#    and hard to make relative value as sports originated at different times
+#  Doesn't include Y as this is highly correlated to GR (games relative)
+final_cols <- c('N','GR','WL%','PGR','PWL%','CC','C','HOF')
+df_fb_f <- df_fb[final_cols]
+df_bkb_f <- df_bkb[final_cols]
+df_bb_f <- df_bb[final_cols]
+df_h_f <- df_h[final_cols]
+# output to csv files
+write.csv(df_fb_f,'data/football_coaches.csv')
+write.csv(df_bkb_f,'data/basketball_coaches.csv')
+write.csv(df_bb_f,'data/baseball_coaches.csv')
+write.csv(df_h_f,'data/hockey_coaches.csv')
+# make PG into 
+head(df_fb_f)
+head(df_bkb_f)
+head(df_bb_f)
+head(df_h_f)
+```
+
