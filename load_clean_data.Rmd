@@ -3,7 +3,7 @@ title: "Load and Clean datasets"
 author: "Aleksei Sorokin, asorokin@hawk.iit.edu, A20394300"
 date: "3/3/2020"
 output: pdf_document
-geometry: margin=1in
+geometry: margin=1cm
 ---
 
 ## Notes
@@ -18,7 +18,7 @@ library(tidyr)
 
 ## Scrape & clean football coaches
 ```{r}
-url_fb <- 'https://www.pro-football-reference.com/coaches/' # hockey
+url_fb <- 'https://www.pro-football-reference.com/coaches/'
 t_fb <- html_nodes(read_html(url_fb), css = 'table')
 df_fb_og <- html_table(t_fb[[1]])
 # rename original columns 
@@ -74,7 +74,7 @@ summary(df_fb)
 
 ## Scrape & clean baksetball coaches
 ```{r}
-url_bkb <- 'https://www.basketball-reference.com/coaches/NBA_stats.html' # hockey
+url_bkb <- 'https://www.basketball-reference.com/coaches/NBA_stats.html'
 t_bkb <- html_nodes(read_html(url_bkb), css = 'table')
 df_bkb_og <- html_table(t_bkb[[1]])[-1,]
 # rename original columns 
@@ -178,13 +178,13 @@ df_bb$N <- str_squish(df_bb$N)
 # reindex
 rownames(df_bb) = 1:nrow(df_bb)
 # output
-df_bb
+head(df_bb)
 summary(df_bb)
 ```
 
 ## Scrape and clean hockey coaches
 ```{r}
-url_h <- 'https://www.hockey-reference.com/coaches/NHL_stats.html' # hockey
+url_h <- 'https://www.hockey-reference.com/coaches/NHL_stats.html'
 t_h <- html_nodes(read_html(url_h), css = 'table')
 df_h_og <- html_table(t_h[[1]])[-1,]
 # rename original columns 
@@ -233,7 +233,7 @@ df_h$N <- str_squish(df_h$N)
 # reindex
 rownames(df_h) = NULL
 # output
-df_h
+head(df_h)
 summary(df_h)
 ```
 
