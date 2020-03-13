@@ -7,10 +7,10 @@ geometry: margin=1cm
 ---
 
 ## Notes
-Data sourced from https://www.pro-football-reference.com/coaches/
+Data sourced from https://www.sports-reference.com/
 
 ## Packages 
-```{r}
+```{r message=F}
 library(stringr)
 library(rvest)
 library(tidyr)
@@ -237,7 +237,7 @@ head(df_h)
 summary(df_h)
 ```
 
-## Overall cleaning and export datasets
+## Overall cleaning and export combined dataset
 ```{r}
 # Make games relative to number of relative season games
 df_fb$GR <- df_fb$G / 16
@@ -259,15 +259,18 @@ df_fb_f <- df_fb[final_cols]
 df_bkb_f <- df_bkb[final_cols]
 df_bb_f <- df_bb[final_cols]
 df_h_f <- df_h[final_cols]
-# output to csv files
-write.csv(df_fb_f,'data/football_coaches.csv')
-write.csv(df_bkb_f,'data/basketball_coaches.csv')
-write.csv(df_bb_f,'data/baseball_coaches.csv')
-write.csv(df_h_f,'data/hockey_coaches.csv')
-# make PG into 
-head(df_fb_f)
-head(df_bkb_f)
-head(df_bb_f)
-head(df_h_f)
+# set sport variable
+df_fb_f[,'Sport'] <- 'football'
+df_bkb_f[,'Sport'] <- 'basketball'
+df_bb_f[,'Sport'] <- 'baseball'
+df_h_f[,'Sport'] <- 'hockey'
+# combine datasets
+library(data.table)
+df_final <- rbindlist(list(df_fb_f,df_bkb_f,df_bb_f,df_h_f))
+df_final <- df_final[order(df_final$N,decreasing=F),]# output to csv file
+# account for championships before conference championships
+df_final$CC <- pmax(df_final$C,df_final$CC)
+# export dataset
+write.csv(df_final,'data/all_coaches.csv',row.names=F)
+head(df_final)
 ```
-

@@ -1,0 +1,85 @@
+---
+title: "Modeling"
+author: "Aleksei Sorokin, asorokin@hawk.iit.edu, A20394300"
+date: "3/12/2020"
+output: pdf_document
+---
+
+## 8 Schools Example from https://rdrr.io/cran/blme/man/blmer.html
+
+Original Example
+```{r}
+y <- c(28, 8, -3, 7, -1, 1, 18, 12);
+sigma <- c(15, 10, 16, 11, 9, 11, 10, 18);
+g <- 1:8;
+  
+schools_ex <- blmer(y ~ 1 + (1 | g), resid.prior = point,
+                  cov.prior = NULL, REML = FALSE,
+                  weights = 1 / sigma^2)
+summary(schools_ex)
+```
+
+custom example
+```{r message=F}
+library(blme)
+y <- c(28, 8, -3, 7, -1, 1, 18, 12);
+f1 = rnorm(8) # fixed effect obs
+r1 <- 1:8; # random effect obs
+sigma <- c(15, 10, 16, 11, 9, 11, 10, 18); # random effect weights
+schools_custom <- blmer(y ~ 1 + f1 + (1 | r1),
+                 resid.prior = point,
+                 fixef.prior	= normal,
+                 cov.priornt,
+                 fixef.prior	= normal,
+                 cov.prior = NULL, REML = FALSE,
+                 weights = 1 / sigma^2)
+summary(schools_customnt,
+                 fixef.prior	= normal,
+                 cov.prior = NULL, REML = FALSE,
+                 weights = 1 / sigma^2)
+summary(schools_custom = NULL, REML = FALSE,
+                 weights = 1 / sigma^2)
+summary(schools_custom)
+```
+
+## Split into train test datasets
+```{r}
+set.seed(7)
+train_frac <- 4/5
+df_HOF_1 <- df[df$HOF==1,]
+df_HOF_0 <- df[df$HOF==0,]
+HOF_1_train <- sample(1:nrow(df_HOF_1),floor(nrow(df_HOF_1)*train_frac))
+HOF_0_train <- sample(1:nrow(df_HOF_0),floor(nrow(df_HOF_0)*train_frac))
+df_train <- rbind(df_HOF_1[HOF_1_train,],df_HOF_0[HOF_0_train,])
+df_test <- rbind(df_HOF_1[-HOF_1_train,],df_HOF_0[-HOF_0_train,])
+l1 <- sprintf('Train Fractio:n %.2f',train_frac)
+l2 <- sprintf('Hall of Fame Coaches: %d. (Train %d , Test %d)',
+        nrow(df_HOF_1),length(HOF_1_train),nrow(df_HOF_1)-length(HOF_1_train))
+l3 <- sprintf('Non Hall of Fame Coaches: %d. (Train %d , Test %d)',
+        nrow(df_HOF_0),length(HOF_0_train),nrow(df_HOF_0)-length(HOF_0_train))
+l4 <- sprintf('Overall: (Train %d , Test %d)',nrow(df_train),nrow(df_test))
+cat(sprintf('%s\n%s\n%s\n%s\n',l1,l2,l3,l4))
+```
+
+## Logistic Regression Model
+```{r}
+lr_model <- glm(HOF ~ Y+G+`WL%`+PY+PG+`PWL%`+MCR+BCR+C+CC+YA1920, data=df_train, family="binomial")
+summary(lr_model)
+```
+
+# Make predictions on test data and calculate metrics
+```{r}
+df_test$yHat <- predict(lr_model, newdata=df_test, type="response")
+df_test$yHat_b <- (df_test$yHat >= .5)
+tp <- sum((df_test$yHat_b==1 & df_test$HOF==1))
+fp <- sum((df_test$yHat_b==1 & df_test$HOF==0))
+fn <- sum((df_test$yHat_b==0 & df_test$HOF==1))
+tn <- sum((df_test$yHat_b==0 & df_test$HOF==0))
+df_wrong <- df_test[df_test$yHat_b!=df_test$HOF] # show wrong predictions
+accuracy <- (tp+tn)/(tp+tn+fp+fn)
+precision <- tp/(tp+fp)
+recall <- tp/(tp+fn)
+cat(sprintf('Accuracy: %.3f\nPrecision: %.3f\nRecall: %.3f',
+            accuracy,precision,recall))
+df_wrong
+```

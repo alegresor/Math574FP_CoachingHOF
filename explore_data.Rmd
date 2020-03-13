@@ -5,6 +5,29 @@ date: "3/4/2020"
 output: pdf_document
 geometry: margin=1in
 ---
+
+## Load data and do some final filtering
+```{r}
+df <- read.csv('data/all_coaches.csv')
+data_dict <- list(
+              N='Name',
+              GR='Games Relative',
+              WP='Win Loss Percentage',
+              PGR='Playoff Games Relative',
+              PWP='Playoff Win Percentage',
+              CC='Conference Championships',
+              C='Championships',
+              HOF='Hall of Fame',
+              S='Sport')
+names(df) <- names(data_dict)
+# export stats
+head(df)
+nrow(df) # total coaches
+sum(df$HOF==1) # total hall of fame coaches
+sum(df$HOF==0) # total non hall of fame coaches
+summary(df)
+```
+
 ## Correlation between data
 ```{r}
 library(corrplot)
@@ -13,44 +36,29 @@ df_corr <- cor(df_num)
 corrplot(df_corr)
 ```
 
-## Split into train test datasets
+## Boxplots over Histograms
 ```{r}
-set.seed(7)
-train_frac <- 4/5
-df_HOF_1 <- df[df$HOF==1,]
-df_HOF_0 <- df[df$HOF==0,]
-HOF_1_train <- sample(1:nrow(df_HOF_1),floor(nrow(df_HOF_1)*train_frac))
-HOF_0_train <- sample(1:nrow(df_HOF_0),floor(nrow(df_HOF_0)*train_frac))
-df_train <- rbind(df_HOF_1[HOF_1_train,],df_HOF_0[HOF_0_train,])
-df_test <- rbind(df_HOF_1[-HOF_1_train,],df_HOF_0[-HOF_0_train,])
-l1 <- sprintf('Train Fractio:n %.2f',train_frac)
-l2 <- sprintf('Hall of Fame Coaches: %d. (Train %d , Test %d)',
-        nrow(df_HOF_1),length(HOF_1_train),nrow(df_HOF_1)-length(HOF_1_train))
-l3 <- sprintf('Non Hall of Fame Coaches: %d. (Train %d , Test %d)',
-        nrow(df_HOF_0),length(HOF_0_train),nrow(df_HOF_0)-length(HOF_0_train))
-l4 <- sprintf('Overall: (Train %d , Test %d)',nrow(df_train),nrow(df_test))
-cat(sprintf('%s\n%s\n%s\n%s\n',l1,l2,l3,l4))
+fixed_cols <- names(df_num)[names(df_num)!='HOF']
+for (col in fixed_cols){
+  # gather data
+  c_name <- data_dict[[col]]
+  data <- df_num[[col]]
+  # make plot
+  layout(mat = matrix(c(1,2),2,1, byrow=TRUE),  height = c(1,8))
+  par(mar=c(0, 3.1, 1.1, 2.1))
+  boxplot(data , horizontal=TRUE , xaxt="n", frame=F,main=sprintf('Histogram of %s',c_name))
+  par(mar=c(4, 3.1, 1.1, 2.1))
+  hist(data,xlab=c_name,main='')
+  # print top coaches in this category
+  cat(sprintf('Top 10 coaches by %s\n',c_name))
+  df_top <- df[order(df[[col]],decreasing=T),] 
+  print(df_top[1:10,])}
 ```
 
-## Logistic Regression Model
+## Some potential problems
+- Dataset does not capture coach's personalities, effect on players, effect on the league, work in community, ...
+- Many coaches are in HOF despite having less than a full year of head coaching.This is probably due to their assistant coaching experience which is not captured in this dataset
+  - It would be nice to filter this dataset to coaches who have only over a year experience to account for outlier such as coaches with a win-loss percentage of 1 because they have only coached one game. However, this would remove almost 50 coaches who made the hall f fame despite having less than a year of head coaching experience
 ```{r}
-lr_model <- glm(HOF ~ Y+G+`WL%`+PY+PG+`PWL%`+MCR+BCR+C+CC+YA1920, data=df_train, family="binomial")
-summary(lr_model)
-```
-
-# Make predictions on test data and calculate metrics
-```{r}
-df_test$yHat <- predict(lr_model, newdata=df_test, type="response")
-df_test$yHat_b <- (df_test$yHat >= .5)
-tp <- sum((df_test$yHat_b==1 & df_test$HOF==1))
-fp <- sum((df_test$yHat_b==1 & df_test$HOF==0))
-fn <- sum((df_test$yHat_b==0 & df_test$HOF==1))
-tn <- sum((df_test$yHat_b==0 & df_test$HOF==0))
-df_wrong <- df_test[df_test$yHat_b!=df_test$HOF] # show wrong predictions
-accuracy <- (tp+tn)/(tp+tn+fp+fn)
-precision <- tp/(tp+fp)
-recall <- tp/(tp+fn)
-cat(sprintf('Accuracy: %.3f\nPrecision: %.3f\nRecall: %.3f',
-            accuracy,precision,recall))
-df_wrong
+head(df[df$GR<1 & df$HOF==1,])
 ```
