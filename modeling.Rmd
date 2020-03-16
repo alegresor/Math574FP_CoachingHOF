@@ -5,41 +5,10 @@ date: "3/12/2020"
 output: pdf_document
 ---
 
-## 8 Schools Example from https://rdrr.io/cran/blme/man/blmer.html
-
-Original Example
+## Load Data
 ```{r}
-y <- c(28, 8, -3, 7, -1, 1, 18, 12);
-sigma <- c(15, 10, 16, 11, 9, 11, 10, 18);
-g <- 1:8;
-  
-schools_ex <- blmer(y ~ 1 + (1 | g), resid.prior = point,
-                  cov.prior = NULL, REML = FALSE,
-                  weights = 1 / sigma^2)
-summary(schools_ex)
-```
-
-custom example
-```{r message=F}
-library(blme)
-y <- c(28, 8, -3, 7, -1, 1, 18, 12);
-f1 = rnorm(8) # fixed effect obs
-r1 <- 1:8; # random effect obs
-sigma <- c(15, 10, 16, 11, 9, 11, 10, 18); # random effect weights
-schools_custom <- blmer(y ~ 1 + f1 + (1 | r1),
-                 resid.prior = point,
-                 fixef.prior	= normal,
-                 cov.priornt,
-                 fixef.prior	= normal,
-                 cov.prior = NULL, REML = FALSE,
-                 weights = 1 / sigma^2)
-summary(schools_customnt,
-                 fixef.prior	= normal,
-                 cov.prior = NULL, REML = FALSE,
-                 weights = 1 / sigma^2)
-summary(schools_custom = NULL, REML = FALSE,
-                 weights = 1 / sigma^2)
-summary(schools_custom)
+df <- read.csv('data/all_coaches.csv')
+head(df)
 ```
 
 ## Split into train test datasets
@@ -61,25 +30,59 @@ l4 <- sprintf('Overall: (Train %d , Test %d)',nrow(df_train),nrow(df_test))
 cat(sprintf('%s\n%s\n%s\n%s\n',l1,l2,l3,l4))
 ```
 
-## Logistic Regression Model
+## Standard Logistic Regression Model
 ```{r}
-lr_model <- glm(HOF ~ Y+G+`WL%`+PY+PG+`PWL%`+MCR+BCR+C+CC+YA1920, data=df_train, family="binomial")
-summary(lr_model)
+model_1 <- glm(HOF ~ GR + PGR + CC + Sport,#GR+WL.+PGR+PWL.+CC+C+Sport,
+               data=df_train,
+               family="binomial")
+summary(model_1)
+df_test$yHat_1 <- predict(model_1, newdata=df_test, type="response")
 ```
 
-# Make predictions on test data and calculate metrics
+## Logistic Mixed Model
+```{r message=F}
+library(lme4)
+model_2 <- lmer(HOF ~ GR + PGR + CC + (1|Sport),#GR + WL. + PGR + PWL. + CC + C + (1 | Sport),
+                data = df_train)
+summary(model_2)
+df_test$yHat_2 <- predict(model_2,df_test, type="response")
+```
+
+## Bayesian Logistic Mixed Model
 ```{r}
-df_test$yHat <- predict(lr_model, newdata=df_test, type="response")
-df_test$yHat_b <- (df_test$yHat >= .5)
-tp <- sum((df_test$yHat_b==1 & df_test$HOF==1))
-fp <- sum((df_test$yHat_b==1 & df_test$HOF==0))
-fn <- sum((df_test$yHat_b==0 & df_test$HOF==1))
-tn <- sum((df_test$yHat_b==0 & df_test$HOF==0))
-df_wrong <- df_test[df_test$yHat_b!=df_test$HOF] # show wrong predictions
-accuracy <- (tp+tn)/(tp+tn+fp+fn)
-precision <- tp/(tp+fp)
-recall <- tp/(tp+fn)
-cat(sprintf('Accuracy: %.3f\nPrecision: %.3f\nRecall: %.3f',
-            accuracy,precision,recall))
-df_wrong
+library(blme)
+model_3 <- blmer(HOF ~ GR + PGR + CC + (1|Sport),# GR + WL. + PGR + PWL. + CC + C + (1 | Sport),
+                 data = df_train,
+                 resid.prior = gamma,
+                 fixef.prior = normal,
+                 cov.prior = wishart)
+summary(model_3)
+df_test$yHat_3 <- predict(model_3, newdata=df_test, type="response")
+```
+
+## Make predictions on test data and calculate metrics
+```{r}
+model_metrics <- function(df_test,yHat_col,model_name){
+  yHat_b_col <- paste0(yHat_col,'b')
+  df_test[,yHat_b_col] <-(df_test[[yHat_col]] >= .5)
+  yHat_b <- df_test[[yHat_b_col]]
+  hof <- df_test$HOF
+  tp <- sum((yHat_b==1 & hof==1))
+  fp <- sum((yHat_b==1 & hof==0))
+  fn <- sum((yHat_b==0 & hof==1))
+  tn <- sum((yHat_b==0 & hof==0))
+  accuracy <- (tp+tn)/(tp+tn+fp+fn)
+  precision <- tp/(tp+fp)
+  recall <- tp/(tp+fn)
+  cat(sprintf('%s\n\tAccuracy: %.3f\n\tPrecision: %.3f\n\tRecall: %.3f\n',
+              model_name,accuracy,precision,recall))
+  return (df_test)}
+```
+
+## Compare models
+```{r}
+df_test <- model_metrics(df_test,'yHat_1','Standard Logistic Regression')
+df_test <- model_metrics(df_test,'yHat_2','Logistic Mixed Model')
+df_test <- model_metrics(df_test,'yHat_3','Bayesian Mixed Model')
+head(df_test[df_test$HOF==1,])
 ```
