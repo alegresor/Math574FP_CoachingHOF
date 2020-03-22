@@ -8,6 +8,17 @@ output: pdf_document
 ## Load Data
 ```{r}
 df <- read.csv('data/all_coaches.csv')
+data_dict <- list(
+              N='Name',
+              GR='Games Relative',
+              WP='Win Loss Percentage',
+              PGR='Playoff Games Relative',
+              PWP='Playoff Win Percentage',
+              CC='Conference Championships',
+              C='Championships',
+              HOF='Hall of Fame',
+              S='Sport')
+names(df) <- names(data_dict)
 head(df)
 ```
 
@@ -32,7 +43,7 @@ cat(sprintf('%s\n%s\n%s\n%s\n',l1,l2,l3,l4))
 
 ## Standard Logistic Regression Model
 ```{r}
-model_1 <- glm(HOF ~ GR + PGR + CC + Sport,#GR+WL.+PGR+PWL.+CC+C+Sport,
+model_1 <- glm(HOF ~ GR + WP + PGR + PWP + CC + C + S,
                data=df_train,
                family="binomial")
 summary(model_1)
@@ -42,20 +53,92 @@ df_test$yHat_1 <- predict(model_1, newdata=df_test, type="response")
 ## Logistic Mixed Model
 ```{r message=F}
 library(lme4)
-model_2 <- lmer(HOF ~ GR + PGR + CC + (1|Sport),#GR + WL. + PGR + PWL. + CC + C + (1 | Sport),
+model_2 <- lmer(HOF ~ GR + WP + PGR + PWP + CC + C + (1|S),
                 data = df_train)
 summary(model_2)
 df_test$yHat_2 <- predict(model_2,df_test, type="response")
 ```
 
 ## Bayesian Logistic Mixed Model
+
+### Games Relative (GR)
+```{r message=FALSE}
+library(fitdistrplus)
+fit_gr <- fitdist(df$GR,'gamma')
+plot(fit_gr)
+summary(fit_gr)
+# --> GR ~ Gamma( .676 , .170 )
+```
+
+### Win-Loss Percentage (WP)
+```{r message=FALSE}
+fit_wp <- fitdist(df$WP,'norm')
+plot(fit_wp)
+summary(fit_wp)
+# --> WP ~ N( .430 , .160 )
+```
+
+### Playoff Games Relative (PGR)
+```{r message=FALSE}
+# include coaches with 0 playoff games
+fit_pgr <- fitdist(df$PGR,'gamma','mme')
+plot(fit_pgr)
+summary(fit_pgr)
+# ony coaches with > 0 playoff games
+df_pgr_gt0 <- df[df$PGR>0,]
+fit_pgr_gt0 <- fitdist(df_pgr_gt0$PGR,'gamma')
+plot(fit_pgr_gt0)
+summary(fit_pgr_gt0)
+# --> PGR ~ Gamma( .940 , .401 )
+```
+
+### Playoff Win-Loss Percentage (PWP)
+```{r message=FALSE}
+# include coaches with 0% playoff win-loss-percentage
+fit_pwp <- fitdist(df$PWP,'norm')
+plot(fit_pwp)
+summary(fit_pwp)
+# only coaches with > 0% playoff win-loss percentage
+df_pwp_gt0 <- df[df$PWP>0,]
+fit_pwp_gt0 <- fitdist(df_pwp_gt0$PWP,'norm')
+plot(fit_pwp_gt0)
+summary(fit_pwp_gt0)
+# --> PWP ~ N( .459 , .146 )
+```
+
+### Conference Championships (CC)
+```{r message=FALSE}
+fit_cc <- fitdist(df$CC,'nbinom')
+plot(fit_cc)
+summary(fit_cc)
+# --> CC ~ Neg-Binomial( .145 , .347 )
+```
+
+### Championships (C)
+```{r message=FALSE}
+fit_c <- fitdist(df$C,'nbinom')
+plot(fit_c)
+summary(fit_c)
+# --> C ~ Neg-Binomial( .119 , 210 )
+```
+
+
+
+### Fit Bayesian GLMM (Logistic) Model
 ```{r}
 library(blme)
-model_3 <- blmer(HOF ~ GR + PGR + CC + (1|Sport),# GR + WL. + PGR + PWL. + CC + C + (1 | Sport),
+# Approximate fits by MLE estimation (as shown above)
+# --> GR  ~ Gamma( .676 , .170 )
+# --> WP  ~ N( .430 , .160 )
+# --> PGR ~ Gamma( .940 , .401 )
+# --> PWP ~ N( .459 , .146 )
+# --> CC  ~ Neg-Binomial( .145 , .347 )
+# --> C   ~ Neg-Binomial( .119 , 210 )
+model_3 <- blmer(HOF ~ GR + WP + PGR + PWP + CC + C + (1|S),
                  data = df_train,
                  resid.prior = gamma,
                  fixef.prior = normal,
-                 cov.prior = wishart)
+                 cov.prior = invwishart)
 summary(model_3)
 df_test$yHat_3 <- predict(model_3, newdata=df_test, type="response")
 ```
@@ -84,5 +167,5 @@ model_metrics <- function(df_test,yHat_col,model_name){
 df_test <- model_metrics(df_test,'yHat_1','Standard Logistic Regression')
 df_test <- model_metrics(df_test,'yHat_2','Logistic Mixed Model')
 df_test <- model_metrics(df_test,'yHat_3','Bayesian Mixed Model')
-head(df_test[df_test$HOF==1,])
+df_test[df_test$HOF==1 & df_test$yHat_3b==F,]
 ```
