@@ -1,0 +1,91 @@
+---
+title: "Bayesian Simulation"
+author: "Aleksei Sorokin, asorokin@hawk.iit.edu, A20394300"
+date: "4/1/2020"
+output: pdf_document
+---
+
+## Load Data
+```{r}
+df <- read.csv('data/all_coaches.csv')
+data_dict <- list(
+              N='Name',
+              GR='Games Relative',
+              WP='Win Loss Percentage',
+              PGR='Playoff Games Relative',
+              PWP='Playoff Win Percentage',
+              CC='Conference Championships',
+              C='Championships',
+              HOF='Hall of Fame',
+              S='Sport')
+names(df) <- names(data_dict)
+head(df)
+```
+
+## Split into train test datasets
+```{r}
+set.seed(7)
+train_frac <- 4/5
+df_HOF_1 <- df[df$HOF==1,]
+df_HOF_0 <- df[df$HOF==0,]
+HOF_1_train <- sample(1:nrow(df_HOF_1),floor(nrow(df_HOF_1)*train_frac))
+HOF_0_train <- sample(1:nrow(df_HOF_0),floor(nrow(df_HOF_0)*train_frac))
+df_train <- rbind(df_HOF_1[HOF_1_train,],df_HOF_0[HOF_0_train,])
+df_test <- rbind(df_HOF_1[-HOF_1_train,],df_HOF_0[-HOF_0_train,])
+l1 <- sprintf('Train Fraction: %.2f',train_frac)
+l2 <- sprintf('Hall of Fame Coaches: %d. (Train %d , Test %d)',
+        nrow(df_HOF_1),length(HOF_1_train),nrow(df_HOF_1)-length(HOF_1_train))
+l3 <- sprintf('Non Hall of Fame Coaches: %d. (Train %d , Test %d)',
+        nrow(df_HOF_0),length(HOF_0_train),nrow(df_HOF_0)-length(HOF_0_train))
+l4 <- sprintf('Overall: (Train %d , Test %d)',nrow(df_train),nrow(df_test))
+cat(sprintf('%s\n%s\n%s\n%s\n',l1,l2,l3,l4))
+```
+
+## Logistic Regression with only GR
+using lm from R
+```{r}
+model_1 <- glm(HOF ~ GR, data=df_train, family="binomial")
+summary(model_1)
+```
+
+Posterior Simulation from non-informative prior
+```{r}
+# constants
+n_sims <- 1000
+x <- df_train[['GR']]
+y <- df_train[['HOF']]
+length(x) == length(y)
+n <- length(y)
+n_mesh <- 100
+# compute posterior density on grid
+beta0 <- seq(-3,-2,length=n_mesh)
+beta1 <- seq(0,.2,length=n_mesh)
+logl <- function(b0,b1){
+  z <- b0+b1*x
+  theta <- exp(z)/(1+exp(z))
+  d <- sum( y*z+log(1-theta) )
+  return(d)}
+log_post_dens <- matrix(NA, n_mesh, n_mesh)
+for (i in 1:n_mesh){
+  for (j in 1:n_mesh){
+    log_post_dens[i,j] <- logl(beta0[i],beta1[j])}}
+post_dens <- exp(log_post_dens - max(log_post_dens))
+# contour plot
+contour(beta0, beta1, post_dens, levels=c(.005,.01,.1,.3,.5,.7,.9),
+        xlab='beta0', ylab='beta1', main='Posterior Density Contour')
+# simulations
+beta0_density <- rowSums(post_dens)
+beta0_idx <- sample (1:n_mesh, n_sims, replace=T, prob=beta0_density)
+b0_sims <- beta0[beta0_idx]
+b1_sims <- rep(NA,n_sims)
+for (i in 1:n_sims){
+  beta1_density_i <- post_dens[beta0_idx[i],]
+  b1_sims[i] <- exp(sample(beta1, 1, prob=beta1_density_i))}
+# intervals
+I_b0 <- quantile(b0_sims,c(0.05,0.95))
+I_b1 <- quantile(b1_sims,c(0.05,0.95))
+# outputs
+cat(sprintf('90%% interval estimate for a: (%.2f,%.2f)\n',I_b0[1],I_b0[2]))
+cat(sprintf('90%% interval estimate for b: (%.2f,%.2f)\n',I_b1[1],I_b1[2]))
+```
+

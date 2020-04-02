@@ -32,7 +32,7 @@ HOF_1_train <- sample(1:nrow(df_HOF_1),floor(nrow(df_HOF_1)*train_frac))
 HOF_0_train <- sample(1:nrow(df_HOF_0),floor(nrow(df_HOF_0)*train_frac))
 df_train <- rbind(df_HOF_1[HOF_1_train,],df_HOF_0[HOF_0_train,])
 df_test <- rbind(df_HOF_1[-HOF_1_train,],df_HOF_0[-HOF_0_train,])
-l1 <- sprintf('Train Fractio:n %.2f',train_frac)
+l1 <- sprintf('Train Fraction: %.2f',train_frac)
 l2 <- sprintf('Hall of Fame Coaches: %d. (Train %d , Test %d)',
         nrow(df_HOF_1),length(HOF_1_train),nrow(df_HOF_1)-length(HOF_1_train))
 l3 <- sprintf('Non Hall of Fame Coaches: %d. (Train %d , Test %d)',
