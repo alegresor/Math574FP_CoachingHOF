@@ -1,7 +1,6 @@
 ---
 title: "Load and Clean datasets"
 author: "Aleksei Sorokin, asorokin@hawk.iit.edu, A20394300"
-date: "3/3/2020"
 output: pdf_document
 geometry: margin=1cm
 ---

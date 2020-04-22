@@ -1,7 +1,6 @@
 ---
 title: "Explore Data"
 author: "Aleksei Sorokin, asorokin@hawk.iit.edu, A20394300"
-date: "3/4/2020"
 output: pdf_document
 geometry: margin=1in
 ---

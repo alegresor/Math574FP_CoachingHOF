@@ -1,7 +1,6 @@
 ---
 title: "Modeling"
 author: "Aleksei Sorokin, asorokin@hawk.iit.edu, A20394300"
-date: "3/12/2020"
 output: pdf_document
 ---
 
